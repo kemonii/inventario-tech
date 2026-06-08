@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import styles from "../styles.module.css";
+// NUEVO: Importamos useRouter para redireccionar después del login
+import { useRouter } from "next/navigation";
 
 export default function LoginForm() {
   const [correo, setCorreo] = useState("");
@@ -9,6 +11,7 @@ export default function LoginForm() {
   const [usuarioLogeado, setUsuarioLogeado] = useState<null | { nombre: string; isAdmin: boolean; rol?: number }>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     try {
@@ -39,7 +42,18 @@ export default function LoginForm() {
       const data = await response.json();
       setLoading(false);
 
+      // Nuevo: Si el login es exitoso, guardamos el token y redireccionamos al dashboard
       if (response.ok) {
+        localStorage.clear();
+        localStorage.setItem("token", data.token);
+        localStorage.setItem(
+          "usuario",
+          JSON.stringify(data.usuario)
+        );
+        router.push("/dashboard");
+      }
+
+      /*if (response.ok) {
         localStorage.setItem("token", data.token);
         localStorage.setItem("usuario", JSON.stringify(data.usuario));
         setUsuarioLogeado({ nombre: data.usuario.nombre, isAdmin: !!data.usuario.isAdmin, rol: data.usuario.rol });
@@ -47,7 +61,7 @@ export default function LoginForm() {
         setPassword("");
       } else {
         setError(data.mensaje || "Error en el login");
-      }
+      }*/
     } catch (err: any) {
       setLoading(false);
       setError(err?.message || "Error de red");
