@@ -6,18 +6,17 @@ export async function GET() {
   try {
     const [rows] = await pool.execute(`
       SELECT 
-        se.id_entrada,
-        se.id_producto,
+        e.id_entrada,
+        e.id_product,
         p.nombre_producto,
         p.codigo_producto,
-        se.cantidad,
-        se.precio_unitario,
-        se.motivo,
-        se.fecha_entrada,
-        se.observaciones
-      FROM StockEntradas se
-      INNER JOIN Productos p ON se.id_producto = p.id_producto
-      ORDER BY se.fecha_entrada DESC
+        e.cantidad,
+        e.precio_unitario,
+        e.fecha_entrada,
+        e.id_usuario
+      FROM Entradas e
+      INNER JOIN Productos p ON e.id_product = p.id_product
+      ORDER BY e.fecha_entrada DESC
     `);
 
     return NextResponse.json(rows);
@@ -29,13 +28,13 @@ export async function GET() {
 // POST - Registrar una nueva entrada de stock
 export async function POST(req) {
   try {
-    const { id_producto, cantidad, precio_unitario, motivo, observaciones } =
+    const { id_product, cantidad, precio_unitario, id_usuario } =
       await req.json();
 
     // Validaciones básicas
-    if (!id_producto || !cantidad || !precio_unitario || !motivo) {
+    if (!id_product || !cantidad || !precio_unitario || !id_usuario) {
       return NextResponse.json(
-        { mensaje: "Los campos id_producto, cantidad, precio_unitario y motivo son obligatorios." },
+        { mensaje: "Los campos id_product, cantidad, precio_unitario e id_usuario son obligatorios." },
         { status: 400 }
       );
     }
@@ -56,8 +55,8 @@ export async function POST(req) {
 
     // Verificar que el producto existe y está activo
     const [producto] = await pool.execute(
-      `SELECT id_producto, stock_actual FROM Productos WHERE id_producto = ? AND estado = 'Activo'`,
-      [id_producto]
+      `SELECT id_product, stock_actual FROM Productos WHERE id_product = ? AND estado = 'Activo'`,
+      [id_product]
     );
 
     if (!producto || producto.length === 0) {
@@ -67,17 +66,17 @@ export async function POST(req) {
       );
     }
 
-    // Registrar la entrada en la tabla StockEntradas
+    // Registrar la entrada en la tabla Entradas
     const [resultado] = await pool.execute(
-      `INSERT INTO StockEntradas (id_producto, cantidad, precio_unitario, motivo, observaciones, fecha_entrada)
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [id_producto, cantidad, precio_unitario, motivo, observaciones || null]
+      `INSERT INTO Entradas (id_product, cantidad, precio_unitario, id_usuario)
+       VALUES (?, ?, ?, ?)`,
+      [id_product, cantidad, precio_unitario, id_usuario]
     );
 
     // Actualizar el stock del producto
     await pool.execute(
-      `UPDATE Productos SET stock_actual = stock_actual + ? WHERE id_producto = ?`,
-      [cantidad, id_producto]
+      `UPDATE Productos SET stock_actual = stock_actual + ? WHERE id_product = ?`,
+      [cantidad, id_product]
     );
 
     return NextResponse.json(

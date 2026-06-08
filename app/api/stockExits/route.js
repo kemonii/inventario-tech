@@ -6,17 +6,18 @@ export async function GET() {
   try {
     const [rows] = await pool.execute(`
       SELECT 
-        ss.id_salida,
-        ss.id_producto,
+        s.id_salida,
+        s.id_product,
         p.nombre_producto,
         p.codigo_producto,
-        ss.cantidad,
-        ss.motivo,
-        ss.fecha_salida,
-        ss.observaciones
-      FROM StockSalidas ss
-      INNER JOIN Productos p ON ss.id_producto = p.id_producto
-      ORDER BY ss.fecha_salida DESC
+        s.cantidad,
+        s.precio_unitario,
+        s.motivo,
+        s.fecha_salida,
+        s.id_usuario
+      FROM Salidas s
+      INNER JOIN Productos p ON s.id_product = p.id_product
+      ORDER BY s.fecha_salida DESC
     `);
 
     return NextResponse.json(rows);
@@ -28,12 +29,13 @@ export async function GET() {
 // POST - Registrar una nueva salida de stock
 export async function POST(req) {
   try {
-    const { id_producto, cantidad, motivo, observaciones } = await req.json();
+    const { id_product, cantidad, precio_unitario, motivo, id_usuario } =
+      await req.json();
 
     // Validaciones básicas
-    if (!id_producto || !cantidad || !motivo) {
+    if (!id_product || !cantidad || !precio_unitario || !motivo || !id_usuario) {
       return NextResponse.json(
-        { mensaje: "Los campos id_producto, cantidad y motivo son obligatorios." },
+        { mensaje: "Los campos id_product, cantidad, precio_unitario, motivo e id_usuario son obligatorios." },
         { status: 400 }
       );
     }
@@ -47,8 +49,8 @@ export async function POST(req) {
 
     // Verificar que el producto existe, está activo y tiene stock suficiente
     const [producto] = await pool.execute(
-      `SELECT id_producto, stock_actual FROM Productos WHERE id_producto = ? AND estado = 'Activo'`,
-      [id_producto]
+      `SELECT id_product, stock_actual FROM Productos WHERE id_product = ? AND estado = 'Activo'`,
+      [id_product]
     );
 
     if (!producto || producto.length === 0) {
@@ -67,17 +69,17 @@ export async function POST(req) {
       );
     }
 
-    // Registrar la salida en la tabla StockSalidas
+    // Registrar la salida en la tabla Salidas
     const [resultado] = await pool.execute(
-      `INSERT INTO StockSalidas (id_producto, cantidad, motivo, observaciones, fecha_salida)
-       VALUES (?, ?, ?, ?, NOW())`,
-      [id_producto, cantidad, motivo, observaciones || null]
+      `INSERT INTO Salidas (id_product, cantidad, precio_unitario, motivo, id_usuario)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id_product, cantidad, precio_unitario, motivo, id_usuario]
     );
 
     // Actualizar el stock del producto (restar)
     await pool.execute(
-      `UPDATE Productos SET stock_actual = stock_actual - ? WHERE id_producto = ?`,
-      [cantidad, id_producto]
+      `UPDATE Productos SET stock_actual = stock_actual - ? WHERE id_product = ?`,
+      [cantidad, id_product]
     );
 
     return NextResponse.json(
