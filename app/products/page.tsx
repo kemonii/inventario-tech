@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Estado = "Activo" | "Inactivo";
 
@@ -33,49 +33,10 @@ type Producto = {
 };
 
 export default function ProductsPage() {
-  const categorias: Categoria[] = [
-    { id_categoria: 1, nombre_categoria: "Laptops" },
-    { id_categoria: 2, nombre_categoria: "Celulares" },
-    { id_categoria: 3, nombre_categoria: "Accesorios" },
-  ];
-
-  const marcas: Marca[] = [
-    { id_marca: 1, nombre_marca: "HP" },
-    { id_marca: 2, nombre_marca: "Samsung" },
-    { id_marca: 3, nombre_marca: "Apple" },
-  ];
-
-  const proveedores: Proveedor[] = [
-    { id_proveedor: 1, nombre_proveedor: "Tech Distribuidora CR" },
-    { id_proveedor: 2, nombre_proveedor: "Importadora Digital" },
-  ];
-
-  const [productos, setProductos] = useState<Producto[]>([
-    {
-      id_producto: 1,
-      codigo_producto: "LAP-001",
-      nombre_producto: "Laptop HP Pavilion",
-      descripcion: "Laptop para oficina y estudio",
-      precio: 450000,
-      stock_actual: 8,
-      id_categoria: 1,
-      id_marca: 1,
-      id_proveedor: 1,
-      estado: "Activo",
-    },
-    {
-      id_producto: 2,
-      codigo_producto: "CEL-001",
-      nombre_producto: "Samsung Galaxy A55",
-      descripcion: "Celular gama media",
-      precio: 280000,
-      stock_actual: 15,
-      id_categoria: 2,
-      id_marca: 2,
-      id_proveedor: 2,
-      estado: "Activo",
-    },
-  ]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
 
   const [codigoProducto, setCodigoProducto] = useState("");
   const [nombreProducto, setNombreProducto] = useState("");
@@ -88,6 +49,68 @@ export default function ProductsPage() {
   const [productoEditando, setProductoEditando] =
     useState<Producto | null>(null);
   const [mensaje, setMensaje] = useState("");
+
+  const cargarProductos = async () => {
+    try {
+      const res = await fetch("/api/products");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al cargar productos.");
+        return;
+      }
+
+      setProductos(data);
+    } catch {
+      setMensaje("Error al cargar productos.");
+    }
+  };
+
+  const cargarCategorias = async () => {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json();
+
+      if (res.ok) {
+        setCategorias(data);
+      }
+    } catch {
+      setMensaje("Error al cargar categorías.");
+    }
+  };
+
+  const cargarMarcas = async () => {
+    try {
+      const res = await fetch("/api/brands");
+      const data = await res.json();
+
+      if (res.ok) {
+        setMarcas(data);
+      }
+    } catch {
+      setMensaje("Error al cargar marcas.");
+    }
+  };
+
+  const cargarProveedores = async () => {
+    try {
+      const res = await fetch("/api/suppliers");
+      const data = await res.json();
+
+      if (res.ok) {
+        setProveedores(data);
+      }
+    } catch {
+      setMensaje("Error al cargar proveedores.");
+    }
+  };
+
+  useEffect(() => {
+    cargarProductos();
+    cargarCategorias();
+    cargarMarcas();
+    cargarProveedores();
+  }, []);
 
   const obtenerNombreCategoria = (id: number) =>
     categorias.find((categoria) => categoria.id_categoria === id)
@@ -112,7 +135,7 @@ export default function ProductsPage() {
     setProductoEditando(null);
   };
 
-  const guardarProducto = (e: React.FormEvent) => {
+  const guardarProducto = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const codigoLimpio = codigoProducto.trim();
@@ -156,51 +179,44 @@ export default function ProductsPage() {
       return;
     }
 
-    if (productoEditando) {
-      setProductos(
-        productos.map((producto) =>
-          producto.id_producto === productoEditando.id_producto
-            ? {
-                ...producto,
-                codigo_producto: codigoLimpio,
-                nombre_producto: nombreLimpio,
-                descripcion: descripcionLimpia,
-                precio: precioNumero,
-                stock_actual: stockNumero,
-                id_categoria: Number(idCategoria),
-                id_marca: Number(idMarca),
-                id_proveedor: Number(idProveedor),
-              }
-            : producto
-        )
-      );
+    try {
+      const res = await fetch("/api/products", {
+        method: productoEditando ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_producto: productoEditando?.id_producto,
+          codigo_producto: codigoLimpio,
+          nombre_producto: nombreLimpio,
+          descripcion: descripcionLimpia,
+          precio: precioNumero,
+          stock_actual: stockNumero,
+          id_categoria: Number(idCategoria),
+          id_marca: Number(idMarca),
+          id_proveedor: Number(idProveedor),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Ocurrió un error al guardar el producto.");
+        return;
+      }
 
       limpiarFormulario();
-      setMensaje("Producto actualizado correctamente.");
-      return;
+      cargarProductos();
+
+      setMensaje(
+        data.message ||
+          (productoEditando
+            ? "Producto actualizado correctamente."
+            : "Producto registrado correctamente.")
+      );
+    } catch {
+      setMensaje("No se pudo conectar con la API de productos.");
     }
-
-    const nuevoId =
-      productos.length > 0
-        ? Math.max(...productos.map((producto) => producto.id_producto)) + 1
-        : 1;
-
-    const nuevoProducto: Producto = {
-      id_producto: nuevoId,
-      codigo_producto: codigoLimpio,
-      nombre_producto: nombreLimpio,
-      descripcion: descripcionLimpia,
-      precio: precioNumero,
-      stock_actual: stockNumero,
-      id_categoria: Number(idCategoria),
-      id_marca: Number(idMarca),
-      id_proveedor: Number(idProveedor),
-      estado: "Activo",
-    };
-
-    setProductos([...productos, nuevoProducto]);
-    limpiarFormulario();
-    setMensaje("Producto registrado correctamente.");
   };
 
   const editarProducto = (producto: Producto) => {
@@ -221,34 +237,63 @@ export default function ProductsPage() {
     setMensaje("Edición cancelada.");
   };
 
-  const desactivarProducto = (idProducto: number) => {
+  const desactivarProducto = async (idProducto: number) => {
     const confirmar = window.confirm(
       "¿Está seguro de desactivar este producto?"
     );
 
     if (!confirmar) return;
 
-    setProductos(
-      productos.map((producto) =>
-        producto.id_producto === idProducto
-          ? { ...producto, estado: "Inactivo" }
-          : producto
-      )
-    );
+    try {
+      const res = await fetch("/api/products", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_producto: idProducto,
+        }),
+      });
 
-    setMensaje("Producto desactivado correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al desactivar producto.");
+        return;
+      }
+
+      cargarProductos();
+      setMensaje(data.message || "Producto desactivado correctamente.");
+    } catch {
+      setMensaje("No se pudo conectar con la API de productos.");
+    }
   };
 
-  const activarProducto = (idProducto: number) => {
-    setProductos(
-      productos.map((producto) =>
-        producto.id_producto === idProducto
-          ? { ...producto, estado: "Activo" }
-          : producto
-      )
-    );
+  const activarProducto = async (idProducto: number) => {
+    try {
+      const res = await fetch("/api/products", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_producto: idProducto,
+          estado: "Activo",
+        }),
+      });
 
-    setMensaje("Producto activado correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al activar producto.");
+        return;
+      }
+
+      cargarProductos();
+      setMensaje(data.message || "Producto activado correctamente.");
+    } catch {
+      setMensaje("No se pudo conectar con la API de productos.");
+    }
   };
 
   return (

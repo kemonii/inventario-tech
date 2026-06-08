@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Marca = {
   id_marca: number;
@@ -9,17 +9,32 @@ type Marca = {
 };
 
 export default function BrandsPage() {
-  const [marcas, setMarcas] = useState<Marca[]>([
-    { id_marca: 1, nombre_marca: "HP", estado: "Activo" },
-    { id_marca: 2, nombre_marca: "Samsung", estado: "Activo" },
-    { id_marca: 3, nombre_marca: "Apple", estado: "Activo" },
-  ]);
-
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [nombreMarca, setNombreMarca] = useState("");
   const [marcaEditando, setMarcaEditando] = useState<Marca | null>(null);
   const [mensaje, setMensaje] = useState("");
 
-  const guardarMarca = (e: React.FormEvent) => {
+  const cargarMarcas = async () => {
+    try {
+      const res = await fetch("/api/brands");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al cargar marcas.");
+        return;
+      }
+
+      setMarcas(data);
+    } catch {
+      setMensaje("No se pudo conectar con la API de marcas.");
+    }
+  };
+
+  useEffect(() => {
+    cargarMarcas();
+  }, []);
+
+  const guardarMarca = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const nombreLimpio = nombreMarca.trim();
@@ -40,37 +55,38 @@ export default function BrandsPage() {
       return;
     }
 
-    if (marcaEditando) {
-      setMarcas(
-        marcas.map((marca) =>
-          marca.id_marca === marcaEditando.id_marca
-            ? { ...marca, nombre_marca: nombreLimpio }
-            : marca
-        )
-      );
+    try {
+      const res = await fetch("/api/brands", {
+        method: marcaEditando ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          marcaEditando
+            ? {
+                id_marca: marcaEditando.id_marca,
+                nombre_marca: nombreLimpio,
+              }
+            : {
+                nombre_marca: nombreLimpio,
+              }
+        ),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Ocurrió un error al guardar.");
+        return;
+      }
 
       setMarcaEditando(null);
       setNombreMarca("");
-      setMensaje("Marca actualizada correctamente.");
-      return;
+      setMensaje(data.message || "Operación realizada correctamente.");
+      cargarMarcas();
+    } catch {
+      setMensaje("No se pudo conectar con la API de marcas.");
     }
-
-    const nuevoId =
-      marcas.length > 0
-        ? Math.max(...marcas.map((marca) => marca.id_marca)) + 1
-        : 1;
-
-    setMarcas([
-      ...marcas,
-      {
-        id_marca: nuevoId,
-        nombre_marca: nombreLimpio,
-        estado: "Activo",
-      },
-    ]);
-
-    setNombreMarca("");
-    setMensaje("Marca registrada correctamente.");
   };
 
   const editarMarca = (marca: Marca) => {
@@ -85,27 +101,60 @@ export default function BrandsPage() {
     setMensaje("Edición cancelada.");
   };
 
-  const desactivarMarca = (idMarca: number) => {
+  const desactivarMarca = async (idMarca: number) => {
     const confirmar = window.confirm("¿Está seguro de desactivar esta marca?");
     if (!confirmar) return;
 
-    setMarcas(
-      marcas.map((marca) =>
-        marca.id_marca === idMarca ? { ...marca, estado: "Inactivo" } : marca
-      )
-    );
+    try {
+      const res = await fetch("/api/brands", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_marca: idMarca,
+        }),
+      });
 
-    setMensaje("Marca desactivada correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al desactivar marca.");
+        return;
+      }
+
+      setMensaje(data.message || "Marca desactivada correctamente.");
+      cargarMarcas();
+    } catch {
+      setMensaje("No se pudo conectar con la API de marcas.");
+    }
   };
 
-  const activarMarca = (idMarca: number) => {
-    setMarcas(
-      marcas.map((marca) =>
-        marca.id_marca === idMarca ? { ...marca, estado: "Activo" } : marca
-      )
-    );
+  const activarMarca = async (idMarca: number) => {
+    try {
+      const res = await fetch("/api/brands", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_marca: idMarca,
+          estado: "Activo",
+        }),
+      });
 
-    setMensaje("Marca activada correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al activar marca.");
+        return;
+      }
+
+      setMensaje(data.message || "Marca activada correctamente.");
+      cargarMarcas();
+    } catch {
+      setMensaje("No se pudo conectar con la API de marcas.");
+    }
   };
 
   return (
