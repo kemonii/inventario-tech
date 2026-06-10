@@ -91,7 +91,8 @@ export async function POST(req) {
   }
 }
 */
-import { NextResponse } from "next/server";
+/**/
+/*import { NextResponse } from "next/server";
 import pool from "../../../lib/db";
 
 // GET - Obtener todas las entradas de stock
@@ -184,4 +185,102 @@ export async function POST(req) {
     return NextResponse.json({ mensaje: error.message }, { status: 500 });
   }
 }
+  /*version nueva*/
+import { NextResponse } from "next/server";
+import sql from "mssql";
+import { getConnection } from "../../../lib/db";
 
+// GET - Obtener todas las entradas de stock
+export async function GET() {
+  try {
+    const pool = await getConnection();
+
+    const result = await pool.request().query(`
+      SELECT 
+        e.id_entrada,
+        e.id_product,
+        p.nombre_producto,
+        p.codigo_producto,
+        e.cantidad,
+        e.precio_unitario,
+        e.fecha_entrada,
+        e.id_usuario
+      FROM Entradas e
+      INNER JOIN Productos p ON e.id_product = p.id_product
+      ORDER BY e.fecha_entrada DESC
+    `);
+
+    return NextResponse.json(result.recordset);
+  } catch (error) {
+    return NextResponse.json({ mensaje: error.message }, { status: 500 });
+  }
+}
+
+// POST - Registrar una nueva entrada de stock
+export async function POST(req) {
+  try {
+    const { id_product, cantidad, precio_unitario, id_usuario } = await req.json();
+
+    if (!id_product || !cantidad || !precio_unitario || !id_usuario) {
+      return NextResponse.json(
+        { mensaje: "Los campos id_product, cantidad, precio_unitario e id_usuario son obligatorios." },
+        { status: 400 }
+      );
+    }
+
+    if (cantidad <= 0) {
+      return NextResponse.json(
+        { mensaje: "La cantidad debe ser mayor a 0." },
+        { status: 400 }
+      );
+    }
+
+    if (precio_unitario <= 0) {
+      return NextResponse.json(
+        { mensaje: "El precio unitario debe ser mayor a 0." },
+        { status: 400 }
+      );
+    }
+
+    const pool = await getConnection();
+
+    // Verificar que el producto existe y está activo
+    const productoResult = await pool
+      .request()
+      .input("id_product", sql.Int, id_product)
+      .query(`SELECT id_product, stock_actual FROM Productos WHERE id_product = @id_product AND estado = 'Activo'`);
+
+    if (!productoResult.recordset || productoResult.recordset.length === 0) {
+      return NextResponse.json(
+        { mensaje: "El producto no existe o está inactivo." },
+        { status: 404 }
+      );
+    }
+
+    // Registrar la entrada
+    await pool
+      .request()
+      .input("id_product", sql.Int, id_product)
+      .input("cantidad", sql.Int, cantidad)
+      .input("precio_unitario", sql.Decimal(10, 2), precio_unitario)
+      .input("id_usuario", sql.Int, id_usuario)
+      .query(`
+        INSERT INTO Entradas (id_product, cantidad, precio_unitario, fecha_entrada, id_usuario)
+        VALUES (@id_product, @cantidad, @precio_unitario, GETDATE(), @id_usuario)
+      `);
+
+    // Actualizar el stock
+    await pool
+      .request()
+      .input("cantidad", sql.Int, cantidad)
+      .input("id_product", sql.Int, id_product)
+      .query(`UPDATE Productos SET stock_actual = stock_actual + @cantidad WHERE id_product = @id_product`);
+
+    return NextResponse.json(
+      { mensaje: "Entrada de stock registrada correctamente." },
+      { status: 201 }
+    );
+  } catch (error) {
+    return NextResponse.json({ mensaje: error.message }, { status: 500 });
+  }
+}
