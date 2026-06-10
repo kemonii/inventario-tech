@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Categoria = {
   id_categoria: number;
@@ -9,18 +9,33 @@ type Categoria = {
 };
 
 export default function CategoriesPage() {
-  const [categorias, setCategorias] = useState<Categoria[]>([
-    { id_categoria: 1, nombre_categoria: "Laptops", estado: "Activo" },
-    { id_categoria: 2, nombre_categoria: "Celulares", estado: "Activo" },
-    { id_categoria: 3, nombre_categoria: "Accesorios", estado: "Activo" },
-  ]);
-
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [nombreCategoria, setNombreCategoria] = useState("");
   const [categoriaEditando, setCategoriaEditando] =
     useState<Categoria | null>(null);
   const [mensaje, setMensaje] = useState("");
 
-  const guardarCategoria = (e: React.FormEvent) => {
+  const cargarCategorias = async () => {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al cargar categorías.");
+        return;
+      }
+
+      setCategorias(data);
+    } catch {
+      setMensaje("No se pudo conectar con la API de categorías.");
+    }
+  };
+
+  useEffect(() => {
+    cargarCategorias();
+  }, []);
+
+  const guardarCategoria = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const nombreLimpio = nombreCategoria.trim();
@@ -42,35 +57,38 @@ export default function CategoriesPage() {
       return;
     }
 
-    if (categoriaEditando) {
-      setCategorias(
-        categorias.map((categoria) =>
-          categoria.id_categoria === categoriaEditando.id_categoria
-            ? { ...categoria, nombre_categoria: nombreLimpio }
-            : categoria
-        )
-      );
+    try {
+      const res = await fetch("/api/categories", {
+        method: categoriaEditando ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          categoriaEditando
+            ? {
+                id_categoria: categoriaEditando.id_categoria,
+                nombre_categoria: nombreLimpio,
+              }
+            : {
+                nombre_categoria: nombreLimpio,
+              }
+        ),
+      });
 
-      setCategoriaEditando(null);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Ocurrió un error al guardar.");
+        return;
+      }
+
       setNombreCategoria("");
-      setMensaje("Categoría actualizada correctamente.");
-      return;
+      setCategoriaEditando(null);
+      setMensaje(data.message || "Operación realizada correctamente.");
+      cargarCategorias();
+    } catch {
+      setMensaje("No se pudo conectar con la API de categorías.");
     }
-
-    const nuevoId =
-      categorias.length > 0
-        ? Math.max(...categorias.map((categoria) => categoria.id_categoria)) + 1
-        : 1;
-
-    const nuevaCategoria: Categoria = {
-      id_categoria: nuevoId,
-      nombre_categoria: nombreLimpio,
-      estado: "Activo",
-    };
-
-    setCategorias([...categorias, nuevaCategoria]);
-    setNombreCategoria("");
-    setMensaje("Categoría registrada correctamente.");
   };
 
   const editarCategoria = (categoria: Categoria) => {
@@ -85,34 +103,63 @@ export default function CategoriesPage() {
     setMensaje("Edición cancelada.");
   };
 
-  const desactivarCategoria = (idCategoria: number) => {
+  const desactivarCategoria = async (idCategoria: number) => {
     const confirmar = window.confirm(
       "¿Está seguro de desactivar esta categoría?"
     );
 
     if (!confirmar) return;
 
-    setCategorias(
-      categorias.map((categoria) =>
-        categoria.id_categoria === idCategoria
-          ? { ...categoria, estado: "Inactivo" }
-          : categoria
-      )
-    );
+    try {
+      const res = await fetch("/api/categories", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_categoria: idCategoria,
+        }),
+      });
 
-    setMensaje("Categoría desactivada correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al desactivar categoría.");
+        return;
+      }
+
+      setMensaje(data.message || "Categoría desactivada correctamente.");
+      cargarCategorias();
+    } catch {
+      setMensaje("No se pudo conectar con la API de categorías.");
+    }
   };
 
-  const activarCategoria = (idCategoria: number) => {
-    setCategorias(
-      categorias.map((categoria) =>
-        categoria.id_categoria === idCategoria
-          ? { ...categoria, estado: "Activo" }
-          : categoria
-      )
-    );
+  const activarCategoria = async (idCategoria: number) => {
+    try {
+      const res = await fetch("/api/categories", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_categoria: idCategoria,
+          estado: "Activo",
+        }),
+      });
 
-    setMensaje("Categoría activada correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al activar categoría.");
+        return;
+      }
+
+      setMensaje(data.message || "Categoría activada correctamente.");
+      cargarCategorias();
+    } catch {
+      setMensaje("No se pudo conectar con la API de categorías.");
+    }
   };
 
   return (

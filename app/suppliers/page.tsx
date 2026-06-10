@@ -1,8 +1,6 @@
-
-
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Proveedor = {
   id_proveedor: number;
@@ -14,25 +12,7 @@ type Proveedor = {
 };
 
 export default function SuppliersPage() {
-  const [proveedores, setProveedores] = useState<Proveedor[]>([
-    {
-      id_proveedor: 1,
-      nombre_proveedor: "Tech Distribuidora CR",
-      telefono: "2222-1111",
-      correo: "ventas@techcr.com",
-      direccion: "San José, Costa Rica",
-      estado: "Activo",
-    },
-    {
-      id_proveedor: 2,
-      nombre_proveedor: "Importadora Digital",
-      telefono: "8888-2222",
-      correo: "info@importadoradigital.com",
-      direccion: "Heredia, Costa Rica",
-      estado: "Activo",
-    },
-  ]);
-
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [nombreProveedor, setNombreProveedor] = useState("");
   const [telefono, setTelefono] = useState("");
   const [correo, setCorreo] = useState("");
@@ -40,6 +20,26 @@ export default function SuppliersPage() {
   const [proveedorEditando, setProveedorEditando] =
     useState<Proveedor | null>(null);
   const [mensaje, setMensaje] = useState("");
+
+  const cargarProveedores = async () => {
+    try {
+      const res = await fetch("/api/suppliers");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al cargar proveedores.");
+        return;
+      }
+
+      setProveedores(data);
+    } catch {
+      setMensaje("No se pudo conectar con la API de proveedores.");
+    }
+  };
+
+  useEffect(() => {
+    cargarProveedores();
+  }, []);
 
   const limpiarFormulario = () => {
     setNombreProveedor("");
@@ -49,7 +49,7 @@ export default function SuppliersPage() {
     setProveedorEditando(null);
   };
 
-  const guardarProveedor = (e: React.FormEvent) => {
+  const guardarProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const nombreLimpio = nombreProveedor.trim();
@@ -84,45 +84,43 @@ export default function SuppliersPage() {
       return;
     }
 
-    if (proveedorEditando) {
-      setProveedores(
-        proveedores.map((proveedor) =>
-          proveedor.id_proveedor === proveedorEditando.id_proveedor
+    try {
+      const res = await fetch("/api/suppliers", {
+        method: proveedorEditando ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          proveedorEditando
             ? {
-                ...proveedor,
+                id_proveedor: proveedorEditando.id_proveedor,
                 nombre_proveedor: nombreLimpio,
                 telefono: telefonoLimpio,
                 correo: correoLimpio,
                 direccion: direccionLimpia,
               }
-            : proveedor
-        )
-      );
+            : {
+                nombre_proveedor: nombreLimpio,
+                telefono: telefonoLimpio,
+                correo: correoLimpio,
+                direccion: direccionLimpia,
+              }
+        ),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Ocurrió un error al guardar.");
+        return;
+      }
 
       limpiarFormulario();
-      setMensaje("Proveedor actualizado correctamente.");
-      return;
+      setMensaje(data.message || "Operación realizada correctamente.");
+      cargarProveedores();
+    } catch {
+      setMensaje("No se pudo conectar con la API de proveedores.");
     }
-
-    const nuevoId =
-      proveedores.length > 0
-        ? Math.max(
-            ...proveedores.map((proveedor) => proveedor.id_proveedor)
-          ) + 1
-        : 1;
-
-    const nuevoProveedor: Proveedor = {
-      id_proveedor: nuevoId,
-      nombre_proveedor: nombreLimpio,
-      telefono: telefonoLimpio,
-      correo: correoLimpio,
-      direccion: direccionLimpia,
-      estado: "Activo",
-    };
-
-    setProveedores([...proveedores, nuevoProveedor]);
-    limpiarFormulario();
-    setMensaje("Proveedor registrado correctamente.");
   };
 
   const editarProveedor = (proveedor: Proveedor) => {
@@ -139,34 +137,63 @@ export default function SuppliersPage() {
     setMensaje("Edición cancelada.");
   };
 
-  const desactivarProveedor = (idProveedor: number) => {
+  const desactivarProveedor = async (idProveedor: number) => {
     const confirmar = window.confirm(
       "¿Está seguro de desactivar este proveedor?"
     );
 
     if (!confirmar) return;
 
-    setProveedores(
-      proveedores.map((proveedor) =>
-        proveedor.id_proveedor === idProveedor
-          ? { ...proveedor, estado: "Inactivo" }
-          : proveedor
-      )
-    );
+    try {
+      const res = await fetch("/api/suppliers", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_proveedor: idProveedor,
+        }),
+      });
 
-    setMensaje("Proveedor desactivado correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al desactivar proveedor.");
+        return;
+      }
+
+      setMensaje(data.message || "Proveedor desactivado correctamente.");
+      cargarProveedores();
+    } catch {
+      setMensaje("No se pudo conectar con la API de proveedores.");
+    }
   };
 
-  const activarProveedor = (idProveedor: number) => {
-    setProveedores(
-      proveedores.map((proveedor) =>
-        proveedor.id_proveedor === idProveedor
-          ? { ...proveedor, estado: "Activo" }
-          : proveedor
-      )
-    );
+  const activarProveedor = async (idProveedor: number) => {
+    try {
+      const res = await fetch("/api/suppliers", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_proveedor: idProveedor,
+          estado: "Activo",
+        }),
+      });
 
-    setMensaje("Proveedor activado correctamente.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMensaje(data.error || "Error al activar proveedor.");
+        return;
+      }
+
+      setMensaje(data.message || "Proveedor activado correctamente.");
+      cargarProveedores();
+    } catch {
+      setMensaje("No se pudo conectar con la API de proveedores.");
+    }
   };
 
   return (
