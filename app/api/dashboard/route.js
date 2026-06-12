@@ -1,59 +1,74 @@
+// Conexion a la base de datos y consultas para el dashboard
 import { NextResponse } from "next/server";
-import pool from "../../../lib/db";
+import { getConnection } from "../../../lib/db";
 
 export async function GET() {
 
   try {
 
-    const [productos] =
-      await pool.execute(
-        "SELECT COUNT(*) total FROM Productos"
-      );
+    const pool = await getConnection();
 
-    const [marcas] =
-      await pool.execute(
-        "SELECT COUNT(*) total FROM Marcas"
-      );
+    const productos =
+      await pool
+        .request()
+        .query(
+          "SELECT COUNT(*) total FROM Productos"
+        );
 
-    const [categorias] =
-      await pool.execute(
-        "SELECT COUNT(*) total FROM Categorias"
-      );
+    const marcas =
+      await pool
+        .request()
+        .query(
+          "SELECT COUNT(*) total FROM Marcas"
+        );
 
-    const [proveedores] =
-      await pool.execute(
-        "SELECT COUNT(*) total FROM Proveedores"
-      );
+    const categorias =
+      await pool
+        .request()
+        .query(
+          "SELECT COUNT(*) total FROM Categorias"
+        );
 
-    const [entradas] =
-      await pool.execute(
-        "SELECT COUNT(*) total FROM Entradas"
-      );
+    const proveedores =
+      await pool
+        .request()
+        .query(
+          "SELECT COUNT(*) total FROM Proveedores"
+        );
 
-    const [salidas] =
-      await pool.execute(
-        "SELECT COUNT(*) total FROM Salidas"
-      );
+    const entradas =
+      await pool
+        .request()
+        .query(
+          "SELECT COUNT(*) total FROM Entradas"
+        );
+
+    const salidas =
+      await pool
+        .request()
+        .query(
+          "SELECT COUNT(*) total FROM Salidas"
+        );
 
     return NextResponse.json({
 
       productos:
-        productos[0].total,
+        productos.recordset[0].total,
 
       marcas:
-        marcas[0].total,
+        marcas.recordset[0].total,
 
       categorias:
-        categorias[0].total,
+        categorias.recordset[0].total,
 
       proveedores:
-        proveedores[0].total,
+        proveedores.recordset[0].total,
 
       entradas:
-        entradas[0].total,
+        entradas.recordset[0].total,
 
       salidas:
-        salidas[0].total
+        salidas.recordset[0].total
 
     });
 
@@ -61,8 +76,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        mensaje:
-          error.message
+        mensaje: error.message
       },
       {
         status: 500
@@ -70,24 +84,5 @@ export async function GET() {
     );
 
   }
+
 }
-
-/*
-SQL SERVER
-
-import { getConnection }
-from "../../../lib/db";
-
-const pool =
- await getConnection();
-
-const productos =
- await pool
-  .request()
-  .query(
-   "SELECT COUNT(*) total FROM Productos"
-  );
-
-const total =
- productos.recordset[0].total;
-*/
